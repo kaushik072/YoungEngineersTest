@@ -165,12 +165,16 @@ class ChartView extends StatelessWidget {
         name: 'Group $groupId',
         width: isHorizontal ? 0.3 : 0.5,
         spacing: 0.2,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(isFirst ? 3 : 0),
-          bottomLeft: Radius.circular(isFirst ? 3 : 0),
-          topRight: Radius.circular(isLast ? 3 : 0),
-          bottomRight: Radius.circular(isLast ? 3 : 0),
-        ),
+        borderRadius:
+            !isHorizontal
+                ? BorderRadius.only(
+                  topRight: Radius.circular(isLast ? 3 : 0),
+                  bottomRight: Radius.circular(isLast ? 3 : 0),
+                )
+                : BorderRadius.only(
+                  topLeft: Radius.circular(isLast ? 3 : 0),
+                  topRight: Radius.circular(isLast ? 3 : 0),
+                ),
         color: data.first.groupData[groupId]?.color ?? Colors.grey,
       );
     }).toList();

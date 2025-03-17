@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:young_engineers/app/data/models/attendance_model.dart';
 
@@ -18,112 +17,45 @@ class ChartView extends StatelessWidget {
       primaryXAxis: CategoryAxis(
         interval: 1,
         labelRotation: 0,
-        majorTickLines: MajorTickLines(size: 5, width: 1),
-        edgeLabelPlacement: EdgeLabelPlacement.none, // Adjust labels properly
+        majorTickLines: const MajorTickLines(size: 5, width: 1),
+        edgeLabelPlacement: EdgeLabelPlacement.none,
         arrangeByIndex: false,
-        labelStyle: TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-        axisLine: AxisLine(color: Colors.blueAccent),
-        majorGridLines: MajorGridLines(color: Colors.transparent),
+        labelStyle: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+        axisLine: const AxisLine(color: Colors.blueAccent),
+        majorGridLines: const MajorGridLines(color: Colors.transparent),
         autoScrollingDelta: 6,
         autoScrollingMode: AutoScrollingMode.end,
       ),
       zoomPanBehavior: ZoomPanBehavior(
-        enablePanning: true, // Allow manual panning
-        zoomMode: ZoomMode.xy, // Scroll only in X direction
+        enablePanning: true,
+        zoomMode: ZoomMode.xy,
       ),
       primaryYAxis: NumericAxis(
-        majorTickLines: MajorTickLines(size: 5, width: 1),
+        majorTickLines: const MajorTickLines(size: 5, width: 1),
         opposedPosition: isHorizontal ? false : true,
-        axisLine: AxisLine(width: 0),
+        axisLine: const AxisLine(width: 0),
         minimum: 10,
-        maximum: 110,
+        maximum: 100,
         interval: 10,
         majorGridLines: MajorGridLines(
-          color: Colors.lightBlue.shade100, // Change grid line color
+          color: Colors.grey.shade200,
           width: 1,
-          dashArray: <double>[5, 5], // Optional: Dashed lines
+          dashArray: const <double>[5, 5],
         ),
         labelFormat: '{value}%',
-        labelStyle: TextStyle(
-          color: Colors.blueAccent, // Y-axis label color
-          fontSize: 8,
+        labelStyle: const TextStyle(
+          color: Colors.black54,
+          fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
       ),
-
       series: <CartesianSeries>[
-        StackedBarSeries<AttendanceData, String>(
-          dataSource: data,
-          xValueMapper: (AttendanceData data, _) => data.date,
-          yValueMapper: (AttendanceData data, _) => data.group1,
-          name: 'Group 1',
-          width: isHorizontal ? 0.25 : 0.4,
-          spacing: 0.2,
-          borderRadius:
-              isHorizontal
-                  ? BorderRadius.only(
-                    bottomLeft: Radius.circular(3),
-                    bottomRight: Radius.circular(3),
-                  )
-                  : BorderRadius.only(
-                    topLeft: Radius.circular(3),
-                    bottomLeft: Radius.circular(3),
-                  ),
-          gradient: LinearGradient(
-            begin: isHorizontal ? Alignment.bottomCenter : Alignment.centerLeft,
-            end: isHorizontal ? Alignment.topCenter : Alignment.centerRight,
-            colors: [Colors.blue, Colors.cyan, Colors.lightBlue.shade200],
-          ),
-        ),
-        StackedBarSeries<AttendanceData, String>(
-          dataSource: data,
-          xValueMapper: (AttendanceData data, _) => data.date,
-          yValueMapper: (AttendanceData data, _) => data.group2,
-          name: 'Group 2',
-          width: isHorizontal ? 0.25 : 0.4,
-          spacing: 0.2,
-          gradient: LinearGradient(
-            begin: isHorizontal ? Alignment.bottomCenter : Alignment.centerLeft,
-            end: isHorizontal ? Alignment.topCenter : Alignment.centerRight,
-            colors: [
-              Colors.red.shade800,
-              Colors.red.shade700,
-              Colors.red.shade500,
-            ],
-          ),
-        ),
-        StackedBarSeries<AttendanceData, String>(
-          dataSource: data,
-          xValueMapper: (AttendanceData data, _) => data.date,
-          yValueMapper: (AttendanceData data, _) => data.group3,
-          name: 'Group 3',
-          width: isHorizontal ? 0.25 : 0.4,
-          spacing: 0.2,
-          borderRadius:
-              isHorizontal
-                  ? BorderRadius.only(
-                    topLeft: Radius.circular(3),
-                    topRight: Radius.circular(3),
-                  )
-                  : BorderRadius.only(
-                    topRight: Radius.circular(3),
-                    bottomRight: Radius.circular(3),
-                  ),
-          gradient: LinearGradient(
-            begin: isHorizontal ? Alignment.bottomCenter : Alignment.centerLeft,
-            end: isHorizontal ? Alignment.topCenter : Alignment.centerRight,
-            colors: [
-              Colors.lightGreen.shade900,
-              Colors.lightGreen.shade800,
-              Colors.lightGreen.shade400,
-            ],
-          ),
-        ),
+        ...data.isNotEmpty ? _generateGroupSeries(data) : [],
+
         ScatterSeries<AttendanceData, String>(
           dataSource: data,
           xValueMapper: (AttendanceData data, _) => data.date,
-          yValueMapper:
-              (AttendanceData data, _) => data.total, // Always at the top
+          yValueMapper: (AttendanceData data, _) => data.totalPercentage,
 
           markerSettings: MarkerSettings(
             isVisible: false,
@@ -142,9 +74,9 @@ class ChartView extends StatelessWidget {
               int pointIndex,
               int seriesIndex,
             ) {
-              double total = data.total;
+              // double total = data.total;
               return Text(
-                '${total.toInt()}%',
+                '${(data as AttendanceData).totalPercentage.toStringAsFixed(1)}%',
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: 8,
@@ -155,8 +87,92 @@ class ChartView extends StatelessWidget {
           ),
         ),
       ],
-      legend: Legend(isVisible: false),
-      tooltipBehavior: TooltipBehavior(enable: true),
+      tooltipBehavior: TooltipBehavior(
+        enable: true,
+        builder: (
+          dynamic data,
+          dynamic point,
+          dynamic series,
+          int pointIndex,
+          int seriesIndex,
+        ) {
+          final AttendanceData attendanceData = data as AttendanceData;
+          return Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Date: ${attendanceData.formattedDate}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                ...attendanceData.groupData.entries.map((entry) {
+                  final groupData = entry.value;
+                  return Text(
+                    'Group ${groupData.groupId}: ${groupData.percentage.toStringAsFixed(1)}%',
+                    style: TextStyle(color: groupData.color),
+                  );
+                }),
+                const Divider(color: Colors.white30),
+                Text(
+                  'Total: ${attendanceData.totalPercentage.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
+  }
+
+  List<StackedBarSeries<AttendanceData, String>> _generateGroupSeries(
+    List<AttendanceData> data,
+  ) {
+    Set<int> groupIds = {};
+    for (var item in data) {
+      groupIds.addAll(item.groupData.keys);
+    }
+    List<int> sortedGroupIds = groupIds.toList()..sort();
+
+    return sortedGroupIds.map((groupId) {
+      bool isFirst = groupId == sortedGroupIds.first;
+      bool isLast = groupId == sortedGroupIds.last;
+
+      return StackedBarSeries<AttendanceData, String>(
+        dataSource: data,
+        xValueMapper: (AttendanceData data, _) => data.formattedDate,
+        yValueMapper: (AttendanceData data, _) {
+          // Calculate proportional percentage within total
+          double totalPercentage = data.totalPercentage;
+          double groupPercentage = data.groupData[groupId]?.percentage ?? 0;
+          int totalGroups = data.groupData.length;
+
+          // Distribute the group's share within total percentage
+          return totalPercentage > 0
+              ? (groupPercentage / totalGroups) * (totalPercentage / 100)
+              : 0;
+        },
+        name: 'Group $groupId',
+        width: isHorizontal ? 0.3 : 0.5,
+        spacing: 0.2,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(isFirst ? 3 : 0),
+          bottomLeft: Radius.circular(isFirst ? 3 : 0),
+          topRight: Radius.circular(isLast ? 3 : 0),
+          bottomRight: Radius.circular(isLast ? 3 : 0),
+        ),
+        color: data.first.groupData[groupId]?.color ?? Colors.grey,
+      );
+    }).toList();
   }
 }

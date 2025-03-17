@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
 
 class AttendanceRecord {
   final int id;
@@ -43,42 +44,26 @@ class AttendanceRecord {
 
 class AttendanceData {
   final String date;
-  final double group1;
-  final double group2;
-  final double group3;
+  final Map<int, AttendanceGroupData> groupData;
 
-  AttendanceData({
-    required this.date,
-    required this.group1,
-    required this.group2,
-    required this.group3,
-  });
+  AttendanceData({required this.date, required this.groupData});
 
-  // Get total percentage
-  double get total => group1 + group2 + group3;
-
-  // Get percentage for a specific group
-  double getGroupPercentage(int groupId) {
-    switch (groupId) {
-      case 1:
-        return group1;
-      case 2:
-        return group2;
-      case 3:
-        return group3;
-      default:
-        return 0.0;
-    }
+  // Get total percentage across all groups
+  double get totalPercentage {
+    if (groupData.isEmpty) return 0.0;
+    double sum = groupData.values.fold(
+      0.0,
+      (sum, group) => sum + group.percentage,
+    );
+    return sum / groupData.length;
   }
 
-  // Format date for display
+  // Get formatted date for display
   String get formattedDate {
     try {
       if (date.contains('-')) {
-        // Weekly date range format
-        return date;
+        return date; // Weekly date range format
       } else {
-        // Daily date format
         final DateTime dateTime = DateFormat('dd\nMMM').parse(date);
         return DateFormat('dd\nMMM').format(dateTime);
       }
@@ -86,25 +71,47 @@ class AttendanceData {
       return date;
     }
   }
+}
 
-  factory AttendanceData.fromGroupCounts(
-    String date,
-    Map<int, int> groupCounts,
-  ) {
-    int total = groupCounts.values.fold(0, (sum, count) => sum + count);
+class AttendanceGroupData {
+  final int groupId;
+  final int posId;
+  final int totalStudents;
+  final int presentStudents;
+  final double percentage;
 
-    return AttendanceData(
-      date: date,
-      group1: total > 0 ? (groupCounts[1] ?? 0) * 100 / total : 0,
-      group2: total > 0 ? (groupCounts[2] ?? 0) * 100 / total : 0,
-      group3: total > 0 ? (groupCounts[3] ?? 0) * 100 / total : 0,
-    );
+  AttendanceGroupData({
+    required this.groupId,
+    required this.posId,
+    required this.totalStudents,
+    required this.presentStudents,
+  }) : percentage =
+           totalStudents > 0 ? (presentStudents * 100 / totalStudents) : 0.0;
+
+  // Get color based on groupId
+  Color get color {
+    switch (groupId) {
+      case 1:
+        return Colors.blue;
+      case 2:
+        return Colors.red;
+      case 3:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
-  @override
-  String toString() {
-    return 'AttendanceData(date: $date, group1: $group1%, group2: $group2%, group3: $group3%)';
-  }
+  // Get position name based on posId
+  String get positionName => posId == 1 ? 'Position 1' : 'Position 2';
+}
+
+class BarData {
+  final double value;
+  final Color color;
+  final int groupId;
+
+  BarData({required this.value, required this.color, required this.groupId});
 }
 
 class ApiExceptionData implements Exception {

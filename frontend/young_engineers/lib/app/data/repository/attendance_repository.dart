@@ -9,9 +9,9 @@ class AttendanceRepository {
 
   AttendanceRepository(this._apiClient);
 
-  Future<Map<String, List<AttendanceData>>> getAttendance(
-    {Map<String, dynamic>? data}
-  ) async {
+  Future<Map<String, List<AttendanceData>>> getAttendance({
+    Map<String, dynamic>? data,
+  }) async {
     try {
       final response = await _apiClient.post(
         ApiEndpoints.getAttendance,
@@ -62,147 +62,145 @@ class AttendanceRepository {
   //     throw ApiException('Failed to fetch daily attendance: $e', null);
   //   }
   // }
-  List<AttendanceData> processDailyData(List<AttendanceRecord> records) {
+    List<AttendanceData> processDailyData(List<AttendanceRecord> records) {
     // Group records by date
-    Map<String, Map<int, int>> dailyGroupCounts = {};
+    Map<String, Map<int, Map<String, int>>> dailyData = {};
 
+    // Process each record
     for (var record in records) {
+      String date = record.date;
+      int groupId = record.groupId;
+
+      // Initialize date entry if not exists
+      dailyData.putIfAbsent(date, () => {});
+      
+      // Initialize group entry if not exists
+      dailyData[date]!.putIfAbsent(groupId, () => {
+        'total': 0,
+        'present': 0,
+      });
+
+      // Increment counters
+      dailyData[date]![groupId]!['total'] = 
+          (dailyData[date]![groupId]!['total'] ?? 0) + 1;
+      
       if (record.status == 'Present') {
-        String formattedDate = record.date; // Already in YYYY-MM-DD format
-
-        // Initialize map for this date if it doesn't exist
-        dailyGroupCounts.putIfAbsent(
-          formattedDate,
-          () => {
-            1: 0, // Initialize group 1
-            2: 0, // Initialize group 2
-            3: 0, // Initialize group 3
-          },
-        );
-
-        // Increment count for the group
-        dailyGroupCounts[formattedDate]![record.groupId] =
-            (dailyGroupCounts[formattedDate]![record.groupId] ?? 0) + 1;
+        dailyData[date]![groupId]!['present'] = 
+            (dailyData[date]![groupId]!['present'] ?? 0) + 1;
       }
     }
 
     // Convert to AttendanceData objects
-    List<AttendanceData> dailyData =
-        dailyGroupCounts.entries.map((entry) {
-          String date = entry.key;
-          Map<int, int> groupCounts = entry.value;
+    List<AttendanceData> result = dailyData.entries.map((dateEntry) {
+      String date = dateEntry.key;
+      Map<int, Map<String, int>> groupsData = dateEntry.value;
 
-          // Calculate total attendance for the day
-          int totalAttendance = groupCounts.values.fold(
-            0,
-            (sum, count) => sum + count,
-          );
+      // Calculate total students and present students for the day
+      int totalStudents = 0;
+      int totalPresent = 0;
 
-          // Calculate percentages
-          double group1Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[1] ?? 0) * 100 / totalAttendance
-                  : 0.0;
-          double group2Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[2] ?? 0) * 100 / totalAttendance
-                  : 0.0;
-          double group3Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[3] ?? 0) * 100 / totalAttendance
-                  : 0.0;
+      // Process each group's data
+      Map<int, AttendanceGroupData> groupDataMap = {};
+      
+      groupsData.forEach((groupId, counts) {
+        int groupTotal = counts['total'] ?? 0;
+        int groupPresent = counts['present'] ?? 0;
+        
+        totalStudents += groupTotal;
+        totalPresent += groupPresent;
 
-          return AttendanceData(
-            date: DateFormat('dd\nMMM').format(DateTime.parse(date)),
-            group1: group1Percentage,
-            group2: group2Percentage,
-            group3: group3Percentage,
-          );
-        }).toList();
+        groupDataMap[groupId] = AttendanceGroupData(
+          groupId: groupId,
+          posId: groupId == 1 ? 1 : 2, // Position ID based on group
+          totalStudents: groupTotal,
+          presentStudents: groupPresent,
+        );
+      });
+
+      // Format date for display
+      String formattedDate = DateFormat('dd\nMMM').format(DateTime.parse(date));
+
+      return AttendanceData(
+        date: formattedDate,
+        groupData: groupDataMap,
+      );
+    }).toList();
 
     // Sort by date in descending order
-    dailyData.sort((a, b) {
+    result.sort((a, b) {
       DateTime dateA = DateFormat('dd\nMMM').parse(a.date);
       DateTime dateB = DateFormat('dd\nMMM').parse(b.date);
       return dateB.compareTo(dateA);
     });
 
-    return dailyData;
+    return result;
   }
 
-  List<AttendanceData> processWeeklyData(List<AttendanceRecord> records) {
-    Map<String, Map<int, int>> weeklyGroupCounts = {};
+List<AttendanceData> processWeeklyData(List<AttendanceRecord> records) {
+    // Group records by week
+    Map<String, Map<int, Map<String, int>>> weeklyData = {};
+    Map<String, String> weekRanges = {};
 
     for (var record in records) {
+      DateTime recordDate = DateTime.parse(record.date);
+      
+      // Find week start (Monday) and end (Sunday)
+      DateTime weekStart = recordDate.subtract(
+        Duration(days: recordDate.weekday - 1)
+      );
+      DateTime weekEnd = weekStart.add(const Duration(days: 6));
+      
+      // Create week key and range
+      String weekKey = weekStart.toString().substring(0, 10);
+      String weekRange = '${DateFormat('dd MMM').format(weekStart)}-${DateFormat('dd MMM').format(weekEnd)}';
+      weekRanges[weekKey] = weekRange;
+
+      // Initialize week data if not exists
+      weeklyData.putIfAbsent(weekKey, () => {});
+      weeklyData[weekKey]!.putIfAbsent(record.groupId, () => {
+        'total': 0,
+        'present': 0,
+      });
+
+      // Update counters
+      weeklyData[weekKey]![record.groupId]!['total'] = 
+          (weeklyData[weekKey]![record.groupId]!['total'] ?? 0) + 1;
+      
       if (record.status == 'Present') {
-        DateTime recordDate = DateTime.parse(record.date);
-
-        // Get the Monday of the week
-        DateTime weekStart = recordDate.subtract(
-          Duration(days: recordDate.weekday - 1),
-        );
-        DateTime weekEnd = weekStart.add(const Duration(days: 6));
-
-        // Create week key with range
-        String weekKey =
-            '${DateFormat('dd MMM').format(weekStart)}-${DateFormat('dd MMM').format(weekEnd)}';
-
-        // Initialize map for this week if it doesn't exist
-        weeklyGroupCounts.putIfAbsent(
-          weekKey,
-          () => {
-            1: 0, // Initialize group 1
-            2: 0, // Initialize group 2
-            3: 0, // Initialize group 3
-          },
-        );
-
-        // Increment count for the group
-        weeklyGroupCounts[weekKey]![record.groupId] =
-            (weeklyGroupCounts[weekKey]![record.groupId] ?? 0) + 1;
+        weeklyData[weekKey]![record.groupId]!['present'] = 
+            (weeklyData[weekKey]![record.groupId]!['present'] ?? 0) + 1;
       }
     }
 
     // Convert to AttendanceData objects
-    List<AttendanceData> weeklyData =
-        weeklyGroupCounts.entries.map((entry) {
-          String weekRange = entry.key;
-          Map<int, int> groupCounts = entry.value;
+    List<AttendanceData> result = weeklyData.entries.map((weekEntry) {
+      String weekKey = weekEntry.key;
+      Map<int, Map<String, int>> groupsData = weekEntry.value;
 
-          // Calculate total attendance for the week
-          int totalAttendance = groupCounts.values.fold(
-            0,
-            (sum, count) => sum + count,
-          );
+      // Process each group's data
+      Map<int, AttendanceGroupData> groupDataMap = {};
+      
+      groupsData.forEach((groupId, counts) {
+        groupDataMap[groupId] = AttendanceGroupData(
+          groupId: groupId,
+          posId: groupId == 1 ? 1 : 2,
+          totalStudents: counts['total'] ?? 0,
+          presentStudents: counts['present'] ?? 0,
+        );
+      });
 
-          // Calculate percentages
-          double group1Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[1] ?? 0) * 100 / totalAttendance
-                  : 0.0;
-          double group2Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[2] ?? 0) * 100 / totalAttendance
-                  : 0.0;
-          double group3Percentage =
-              totalAttendance > 0
-                  ? (groupCounts[3] ?? 0) * 100 / totalAttendance
-                  : 0.0;
-
-          return AttendanceData(
-            date: weekRange,
-            group1: group1Percentage,
-            group2: group2Percentage,
-            group3: group3Percentage,
-          );
-        }).toList();
+      return AttendanceData(
+        date: weekRanges[weekKey] ?? weekKey,
+        groupData: groupDataMap,
+      );
+    }).toList();
 
     // Sort by week start date in descending order
-    weeklyData.sort((a, b) {
+    result.sort((a, b) {
       String getStartDate(String range) => range.split('-')[0];
       return getStartDate(b.date).compareTo(getStartDate(a.date));
     });
 
-    return weeklyData;
+    return result;
   }
 }
